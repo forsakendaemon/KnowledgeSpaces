@@ -1,13 +1,13 @@
-# knowledgespaces
+# Knowledge Spaces
 
-## GitHub configuration
+This repository attempts to codify and prove, using Lean 4, the basic theory of Knowledge Spaces.
 
-To set up your new GitHub repository, follow these steps:
+Its development follows my own development and understanding of Lean, so the style is unlikely to be particularly good.
 
-* Under your repository name, click **Settings**.
-* In the **Actions** section of the sidebar, click "General".
-* Check the box **Allow GitHub Actions to create and approve pull requests**.
-* Click the **Pages** section of the settings sidebar.
-* In the **Source** dropdown menu, select "GitHub Actions".
+I use LLMs to develop my awareness and understanding of concepts, and so portions of the code have been written with AI assistance.
 
-After following the steps above, you can remove this section from the README file.
+## References
+
+1. Doignon, J.-P., & Falmagne, J.-C. (1999). *Knowledge spaces*. Springer.
+2. Albert, D., & Lukas, J. (1999). *Knowledge spaces: Theories, empirical research, and applications*. L. Erlbaum.
+3. Falmagne, J.-C., Albert, D., Doble, C., Eppstein, D., & Hu, X. (Eds). (2013). *Knowledge Spaces: Applications in Education*. Springer Berlin Heidelberg. https://doi.org/10.1007/978-3-642-35329-1
