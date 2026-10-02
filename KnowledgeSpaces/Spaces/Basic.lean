@@ -8,6 +8,8 @@ module
 
 public import KnowledgeSpaces.Structures.Basic
 import Mathlib.Data.Set.Basic
+public import Mathlib.Data.Set.Finite.Basic
+public import Mathlib.Data.Fintype.Powerset
 import Mathlib.Order.BooleanAlgebra.Set
 
 /-!
@@ -114,8 +116,8 @@ theorem RelSet.contains_q (rs : @RelSet α) :
     exact ha_empty
 
 theorem RelSet.closed_union (rs : @RelSet α) :
-  ∀ x ∈ rs.states, ∀ y ∈ rs.states, x ∪ y ∈ rs.states := by
-  intro x hx y hy
+  x ∈ rs.states -> y ∈ rs.states -> x ∪ y ∈ rs.states := by
+  intro hx hy
   constructor
   · simp only [Set.mem_powerset_iff, Set.union_subset_iff]
     apply And.intro
@@ -190,5 +192,45 @@ def kspace_from_rel (rs : @RelSet α) {hq : rs.q.Nonempty} : @KSpace α :=
     ∀ (y : Set α), y ∈ kstruct.States →
     x ∪ y ∈ kstruct.States := by
       intro x hx y hy
-      exact rs.closed_union x hx y hy
+      exact rs.closed_union hx hy
   KSpace.mk kstruct kscu
+
+def q : Set ℕ := {1, 2, 3}
+def r (x y : Set ℕ) : Prop :=
+  let test : Set (Set ℕ × Set ℕ):= {({1, 2}, {3})}
+  (x, y) ∈ test
+def rs := RelSet.mk q r
+
+lemma finite_powerset_of_finite {s : Set α} (hs : Set.Finite s) :
+  Set.Finite (𝒫 s) := by
+  classical
+  let _ : Finite s := hs.to_subtype
+  let f : Set s → Set α := fun t => Subtype.val '' t
+  have hf : Set.Finite (f '' Set.univ) := (Set.finite_univ (α := Set s)).image f
+  rw [show 𝒫 s = f '' Set.univ by
+    ext t
+    constructor
+    · intro ht
+      refine ⟨Subtype.val ⁻¹' t, trivial, ?_⟩
+      ext a
+      constructor
+      · intro ha
+        rcases ha with ⟨a', ha't, rfl⟩
+        exact ha't
+      · intro ha
+        exact ⟨⟨a, ht ha⟩, ha, rfl⟩
+    · intro ht
+      rcases ht with ⟨u, _hu, rfl⟩
+      intro a ha
+      rcases ha with ⟨a', _ha'u, rfl⟩
+      exact a'.property]
+  exact hf
+
+theorem rs_states_finite : Set.Finite rs.states := by
+  have hq : Set.Finite rs.q := by
+    unfold rs q
+    simp
+  exact (finite_powerset_of_finite hq).subset (rs.elem_subs_q)
+
+
+#check rs_states_finite.toFinset

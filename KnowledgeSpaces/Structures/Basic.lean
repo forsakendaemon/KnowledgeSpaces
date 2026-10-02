@@ -29,6 +29,8 @@ universe u
 
 variable {α : Type u}
 
+
+
 public structure KStruct {α} where
   States : Set (Set α)
   domain_nonempty : (⋃₀ States).Nonempty
@@ -39,15 +41,15 @@ public def Domain {α} (K : Set (Set α)) : Set α := ⋃₀ K
 
 public def KStruct.Domain {α} {k : @KStruct α} : Set α := ⋃₀ k.States
 
-public theorem states_subset_domain {α} {K : Set (Set α)} :
-  ∀ s ∈ K, s ⊆ Domain K := by
-    intro s h x hx
+public theorem states_subset_domain {α s} {K : Set (Set α)} :
+  s ∈ K -> s ⊆ Domain K := by
+    intro h x hx
     exact Set.mem_sUnion.mpr ⟨ s, h, hx ⟩
 
-public theorem items_in_states_in_domain {α} {K : Set (Set α)} :
-  ∀ s ∈ K, ∀ i ∈ s, i ∈ (Domain K) := by
-    intro s h x hx
-    exact states_subset_domain s h hx
+public theorem items_in_states_in_domain {α s i} {K : Set (Set α)} :
+  s ∈ K -> i ∈ s -> i ∈ (Domain K) := by
+    intro hs hi
+    exact states_subset_domain hs hi
 
 public def KStruct.K_q {α} {k : @KStruct α} (q : α) : Set (Set α) :=
     { x ∈ k.States | q ∈ x }
@@ -58,23 +60,23 @@ public def KStruct.Notion {α} {k : @KStruct α} (q : α) : Set α :=
 public def KStruct.Notions {α} {k : @KStruct α} : Set (Set α) :=
   { k.Notion x | x ∈ k.Domain}
 
-public lemma notion_contains_q {α} {k : @KStruct α} :
-  ∀ x ∈ k.Domain, x ∈ k.Notion x := by
-    intro x hx
+public lemma notion_contains_q {α x} {k : @KStruct α} :
+  x ∈ k.Domain -> x ∈ k.Notion x := by
+    intro hx
     constructor
     · exact hx
     · rfl
 
-public theorem notion_nonempty {α} {k : @KStruct α} :
-  ∀ x ∈ k.Domain, (k.Notion x).Nonempty := by
-    intro x hx
-    let h := notion_contains_q x hx
+public theorem notion_nonempty {α x} {k : @KStruct α} :
+  x ∈ k.Domain -> (k.Notion x).Nonempty := by
+    intro hx
+    let h := notion_contains_q hx
     exact Set.nonempty_def.mpr ⟨ x, h ⟩
 
-public theorem notions_disjoint {α} {k : @KStruct α} :
-  ∀ x ∈ k.Domain, ∀ y ∈ k.Domain,
+public theorem notions_disjoint {α x y} {k : @KStruct α} :
+  x ∈ k.Domain -> y ∈ k.Domain ->
   (k.Notion x = k.Notion y) ∨ (Disjoint (k.Notion x) (k.Notion y)) := by
-    intro x hx y hy
+    intro hx hy
     by_cases h : k.K_q x = k.K_q y
     · left
       ext z
@@ -97,7 +99,7 @@ public theorem notions_cover {α}
       rcases hn with ⟨ x, hx, rfl ⟩
       exact hzn.left
     · intro hz
-      let hzn := notion_contains_q z hz
+      let hzn := notion_contains_q hz
       exact Set.mem_sUnion.mpr ⟨ k.Notion z, ⟨ z, hz, rfl ⟩, hzn ⟩
 
 public theorem notions_nonempty {α}
@@ -105,8 +107,10 @@ public theorem notions_nonempty {α}
     rw [notions_cover k]
     exact k.domain_nonempty
 
-public def notion_rel {α} (k : @KStruct α) : α -> α -> Prop :=
-  fun a b => (k.Notion a) = (k.Notion b)
+abbrev Relation α := α -> α -> Prop
+
+public def notion_rel {α} (k : @KStruct α) : Relation α := fun (a b : α) =>
+  (k.Notion a) = (k.Notion b)
 
 public theorem notion_equiv {α} {k : @KStruct α} :
   Equivalence (notion_rel k) := {
@@ -145,10 +149,10 @@ public lemma notions_state_singleton {α} {k : @KStruct α} {y : Set α}
   · intro hn
     have hn' : n = k.Notion x := Set.mem_singleton_iff.mp hn
     subst n
-    exact ⟨x, notion_contains_q x hx, rfl⟩
+    exact ⟨x, notion_contains_q hx, rfl⟩
 
 public structure DiscKStruct {α} extends @KStruct α where
-  atomic_notions : ∀ x ∈ toKStruct.Domain, (toKStruct.Notion x) = {x}
+  atomic_notions : x ∈ toKStruct.Domain -> (toKStruct.Notion x) = {x}
 
 public instance : Coe (@KStruct α) (@DiscKStruct (Set α)) where
   coe k :=
@@ -161,14 +165,14 @@ public instance : Coe (@KStruct α) (@DiscKStruct (Set α)) where
       exact Set.mem_sUnion.mpr
         ⟨ {k.Notion z | z ∈ k.Notion x},
           Or.inl ⟨ k.Notion x, ⟨ x, hx, rfl ⟩, rfl ⟩,
-          ⟨ x, notion_contains_q x hx, rfl ⟩ ⟩
+          ⟨ x, notion_contains_q hx, rfl ⟩ ⟩
     let hkcce : ∅ ∈ Kcomp := by
       exact Or.inr (by simp)
     let hkccu : ⋃₀ Kcomp ∈ Kcomp := by
       exact Or.inr (by simp [Kcomp, Ustar])
     let ks : KStruct := KStruct.mk Kcomp hkcne hkcce hkccu
-    let hksan : ∀ x ∈ ks.Domain, (ks.Notion x) = {x} := by
-      intro x hx
+    let hksan {x : Set α} : x ∈ ks.Domain -> (ks.Notion x) = {x} := by
+      intro hx
       ext y
       constructor
       · intro hy
@@ -202,13 +206,13 @@ public instance : Coe (@KStruct α) (@DiscKStruct (Set α)) where
       · intro hy
         have hyx : y = x := Set.mem_singleton_iff.mp hy
         subst y
-        exact notion_contains_q x hx
+        exact notion_contains_q hx
     DiscKStruct.mk ks hksan
 
 public def KStruct.isFinite {α} {k : @KStruct α} : Prop := Finite (k.Domain)
 
-public def KStruct.isEssentiallyFinite {α} {k : @KStruct α} : Prop := Countable (k.States)
+public def KStruct.isEssentiallyFinite {α} {k : @KStruct α} : Prop := Finite (k.States)
 
-public def KStruct.isCountable {α} {k : @KStruct α} : Prop := Finite (k.Domain)
+public def KStruct.isCountable {α} {k : @KStruct α} : Prop := Countable (k.Domain)
 
 public def KStruct.isEssentiallyCountable {α} {k : @KStruct α} : Prop := Countable (k.States)
