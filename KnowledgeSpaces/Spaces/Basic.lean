@@ -39,7 +39,6 @@ lemma self_in_powerset :
     apply Set.mem_powerset
     apply subset_refl
 
-
 def KStruct.Dual {α} {k : @KStruct α} : @KStruct α :=
   let D := ⋃₀ k.States
   let Kbar := {x ∈ 𝒫 D | (D \ x) ∈ k.States}
@@ -71,29 +70,39 @@ def KStruct.Dual {α} {k : @KStruct α} : @KStruct α :=
 
 abbrev Relation α := α -> α -> Prop
 
-def relset (q : Set α) (r : Relation (Set α)) : Set (Set α) :=
-  {k ∈ 𝒫 q | ∀ x ∈ 𝒫 q, ∀ y ∈ 𝒫 q, x.Nonempty -> y.Nonempty -> r x y -> x ∩ k = ∅ -> y ∩ k = ∅}
+structure RelSet where
+  q : Set α
+  r : Relation (Set α)
 
-lemma relset_elem_subs_q (q : Set α) (r : Relation (Set α)) :
-  ∀ x ∈ relset q r, x ⊆ q := by
+def RelSet.states (rs : @RelSet α) : Set (Set α) :=
+  {
+    k ∈ 𝒫 rs.q |
+    ∀ x ∈ 𝒫 rs.q, ∀ y ∈ 𝒫 rs.q,
+    x.Nonempty -> y.Nonempty ->
+    rs.r x y ->
+    x ∩ k = ∅ -> y ∩ k = ∅
+  }
+
+theorem RelSet.elem_subs_q (rs : @RelSet α) :
+  ∀ x ∈ rs.states, x ⊆ rs.q := by
   intro x hx
   rcases hx with ⟨ left, _ ⟩
   apply Set.mem_powerset left
 
-theorem relset_contains_empty (q : Set α) (r : Relation (Set α)) :
-  ∅ ∈ relset q r := by
+theorem RelSet.contains_empty (rs : @RelSet α) :
+  ∅ ∈ rs.states := by
   constructor
   · exact empty_in_powerset
   · intro x hx y hy xne yne rxy xde
     rw [Set.inter_comm]
     exact Set.empty_inter y
 
-theorem relset_nonempty (q : Set α) (r : Relation (Set α)) :
-  (relset q r).Nonempty := by
-  exact Set.nonempty_of_mem (relset_contains_empty q r)
+theorem RelSet.nonempty (rs : @RelSet α) :
+  rs.states.Nonempty := by
+  exact Set.nonempty_of_mem rs.contains_empty
 
-theorem relset_contains_q (q : Set α) (r : Relation (Set α)) :
-  q ∈ relset q r := by
+theorem RelSet.contains_q (rs : @RelSet α) :
+  rs.q ∈ rs.states := by
   constructor
   · exact self_in_powerset
   · intro x hx y hy xne yne rxy xde
@@ -104,21 +113,14 @@ theorem relset_contains_q (q : Set α) (r : Relation (Set α)) :
     exfalso
     exact ha_empty
 
-theorem relset_union_nonempty (q : Set α) (r : Relation (Set α)) {hq : q.Nonempty} :
-  (⋃₀ relset q r).Nonempty := by
-  have h : q ∈ relset q r := relset_contains_q q r
-  rcases hq with ⟨ a, ha ⟩ -- Creates an existence proof from Nonempty
-  exact ⟨ a, Set.mem_sUnion.mpr ⟨ q, h, ha ⟩ ⟩
-
-theorem relset_closed_union (q : Set α) (r : Relation (Set α)) :
-  let rs := relset q r
-  ∀ x ∈ rs, ∀ y ∈ rs, x ∪ y ∈ rs := by
-  intro rs x hx y hy
+theorem RelSet.closed_union (rs : @RelSet α) :
+  ∀ x ∈ rs.states, ∀ y ∈ rs.states, x ∪ y ∈ rs.states := by
+  intro x hx y hy
   constructor
   · simp only [Set.mem_powerset_iff, Set.union_subset_iff]
     apply And.intro
-    · exact relset_elem_subs_q q r x hx
-    · exact relset_elem_subs_q q r y hy
+    · exact rs.elem_subs_q x hx
+    · exact rs.elem_subs_q y hy
   · intro z hz w hw zne wne rzw zde
     have hzdx : z ∩ x = ∅ := by
       ext a
@@ -153,36 +155,40 @@ theorem relset_closed_union (q : Set α) (r : Relation (Set α)) :
     · intro ha
       exact False.elim ha
 
-theorem relset_sunion_q (q : Set α) (r : Relation (Set α)) :
-  ⋃₀ relset q r = q := by
+theorem RelSet.sunion_q (rs : @RelSet α) :
+  ⋃₀ rs.states = rs.q := by
     ext z
     constructor
     · simp only [Set.mem_sUnion, forall_exists_index, and_imp]
       intro x hx hz
-      rw [relset] at hx
+      rw [RelSet.states] at hx
       rcases hx with ⟨ a, ha ⟩
       apply Set.mem_powerset a
       exact hz
     · intro hz
       rw [Set.mem_sUnion]
-      exact ⟨ q, relset_contains_q q r, hz⟩
+      exact ⟨ rs.q, rs.contains_q, hz⟩
 
-theorem relset_closed_sunion (q : Set α) (r : Relation (Set α)) :
-  ⋃₀ relset q r ∈ relset q r := by
-  rw [relset_sunion_q]
-  exact relset_contains_q q r
+theorem RelSet.closed_sunion (rs : @RelSet α) :
+  ⋃₀ rs.states ∈ rs.states := by
+  rw [rs.sunion_q]
+  exact rs.contains_q
 
-def kspace_from_rel (q : Set α) (r : Relation (Set α)) {hq : q.Nonempty} : @KSpace α :=
-  let rs := relset q r
+theorem RelSet.union_nonempty (rs : @RelSet α) {hq : rs.q.Nonempty} :
+  (⋃₀ rs.states).Nonempty := by
+  rcases hq with ⟨ a, ha ⟩ -- Creates an existence proof from Nonempty
+  exact ⟨ a, Set.mem_sUnion.mpr ⟨ rs.q, rs.contains_q, ha ⟩ ⟩
+
+def kspace_from_rel (rs : @RelSet α) {hq : rs.q.Nonempty} : @KSpace α :=
   let kstruct := KStruct.mk
-    rs
-    (@relset_union_nonempty α q r hq)
-    (relset_contains_empty q r)
-    (relset_closed_sunion q r)
+    rs.states
+    (rs.union_nonempty (hq := hq))
+    rs.contains_empty
+    rs.closed_sunion
   let kscu :
     ∀ (x : Set α), x ∈ kstruct.States →
     ∀ (y : Set α), y ∈ kstruct.States →
     x ∪ y ∈ kstruct.States := by
       intro x hx y hy
-      exact relset_closed_union q r x hx y hy
+      exact rs.closed_union x hx y hy
   KSpace.mk kstruct kscu
