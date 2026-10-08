@@ -7,13 +7,13 @@ Authors: David Allen
 module
 
 import Mathlib.Data.Set.Basic
--- import KnowledgeSpaces.KnowledgeSpace
+public import KnowledgeSpaces.KnowledgeSpace
 public import KnowledgeSpaces.Util
 
 /-!
 # RelationSet
 
-Basic definition of a knowledge space.
+Basic definition of a Set induced on a space by a Relation. Note that the space must be nonempty.
 -/
 
 @[expose] public section
@@ -22,12 +22,13 @@ universe u
 
 class RelationSet (X : Type u) where
   r : Relation (Set X)
+  univ_nonempty : Nonempty X
 
 section Defs
 
-variable {X : Type u} [RelationSet X] {x y : Set X} {p q : X}
+namespace RelationSet
 
-def r : Relation (Set X) := RelationSet.r
+variable {X : Type u} [RelationSet X] {x y : Set X} {p q : X}
 
 def IsState : Set X -> Prop := fun (k) =>
   ∀ x y : Set X,
@@ -114,16 +115,26 @@ theorem closed_sunion :
   rw [sunion_q]
   exact contains_q
 
--- def kspace_from_rel : KnowledgeSpace X :=
---   let kstruct := KnowledgeStructure.mk
---     rs.states
---     (rs.union_nonempty (hq := hq))
---     rs.contains_empty
---     rs.closed_sunion
---   let kscu :
---     ∀ (x : Set α), x ∈ kstruct.States →
---     ∀ (y : Set α), y ∈ kstruct.States →
---     x ∪ y ∈ kstruct.States := by
---       intro x hx y hy
---       exact rs.closed_union hx hy
---   KSpace.mk kstruct kscu
+theorem union_nonempty : (⋃₀ (States : Set (Set X))).Nonempty := by
+  simp only [Set.nonempty_sUnion]
+  exact ⟨ Univ, contains_q, Set.nonempty_iff_univ_nonempty.mp univ_nonempty ⟩
+
+instance {X : Type u} : Coe (RelationSet X) (Family X) where
+  coe k := Family.mk k.IsState
+
+instance {X : Type u} : Coe (RelationSet X) (KnowledgeSpace X) where
+  coe k :=
+    let fam : Family X := k
+    letI : Family X := fam
+    have h₁: (⋃₀ {x : Set X | Family.IsMember x}).Nonempty := union_nonempty
+    have h₂: Family.IsMember (∅ : Set X) := contains_empty
+    have h₃: Family.IsMember (⋃₀ {x : Set X | Family.IsMember x}) := closed_sunion
+    have h₄ : ∀ {x y},
+      Family.IsMember x → Family.IsMember y → Family.IsMember (x ∪ y) := by
+      intro x y hx hy
+      exact closed_union hx hy
+    let kstruct : KnowledgeStructure X := KnowledgeStructure.mk h₁ h₂ h₃
+    letI : KnowledgeStructure X := kstruct
+    KnowledgeSpace.mk h₄
+
+end RelationSet

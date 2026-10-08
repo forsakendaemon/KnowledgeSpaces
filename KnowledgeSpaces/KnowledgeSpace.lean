@@ -25,7 +25,11 @@ class KnowledgeSpace (X : Type u) extends KnowledgeStructure X where
 
 section Defs
 
+namespace KnowledgeSpace
+
 variable {X : Type u} [KnowledgeSpace X] {x y : Set X} {p q : X}
+
+def States : Set (Set X) := KnowledgeStructure.States
 
 @[instance_reducible]
 def Dual :=
@@ -57,3 +61,5 @@ def Dual :=
   let fam : Family X := Family.mk (fun s => s ∈ Kbar)
   letI : Family X := fam
   KnowledgeStructure.mk hkbne hkbce hkbcu
+
+end KnowledgeSpace

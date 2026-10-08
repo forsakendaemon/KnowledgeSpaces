@@ -21,9 +21,3 @@ universe u
 
 class Family (X : Type u) where
   IsMember : Set X -> Prop
-
--- section Defs
-
--- variable {α : Type u} [Family α] {s : Set α}
-
--- def IsMember : Set α -> Prop := Family.IsMember

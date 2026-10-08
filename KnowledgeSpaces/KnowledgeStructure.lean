@@ -32,9 +32,13 @@ class KnowledgeStructure (X : Type u) extends Family X where
 
 section Defs
 
-variable {X : Type u} [KnowledgeStructure X] {x y : Set X} {p q : X}
+variable {X : Type u} [KnowledgeStructure X]
 
 def IsMember : Set X -> Prop := Family.IsMember
+
+namespace KnowledgeStructure
+
+variable {x y : Set X} {p q : X}
 
 def States : Set (Set X) := {x | IsMember x}
 
@@ -151,6 +155,16 @@ lemma notions_state_singleton :
     subst n
     exact ⟨y, notion_contains_q hy, rfl⟩
 
+end KnowledgeStructure
+
+def Domain : Set X := KnowledgeStructure.Domain
+
+def Notion : X -> Set X := KnowledgeStructure.Notion
+
+def Notions : Set (Set X) := KnowledgeStructure.Notions
+
+def K_q : X -> Set (Set X) := KnowledgeStructure.K_q
+
 structure DiscriminativeKStructure (X : Type u) extends KnowledgeStructure X where
   atomic_notions :
     ∀ p, p ∈ @Domain X toKnowledgeStructure ->
@@ -168,7 +182,7 @@ instance {X : Type u} : Coe (KnowledgeStructure X) (DiscriminativeKStructure (Se
       exact Set.mem_sUnion.mpr
         ⟨ {Notion z | z ∈ Notion x},
           Or.inl ⟨ Notion x, ⟨ x, hx, rfl ⟩, rfl ⟩,
-          ⟨ x, notion_contains_q hx, rfl ⟩ ⟩
+          ⟨ x, k.notion_contains_q hx, rfl ⟩ ⟩
     let hkcce : ∅ ∈ Kcomp := by
       exact Or.inr (by simp)
     let hkccu : ⋃₀ Kcomp ∈ Kcomp := by
@@ -209,7 +223,7 @@ instance {X : Type u} : Coe (KnowledgeStructure X) (DiscriminativeKStructure (Se
         rcases Set.mem_sUnion.mp hxUstar with ⟨ s, hsKstar, hxs ⟩
         rcases hsKstar with ⟨ n, hnNotions, rfl ⟩
         have hsingle : {Notion z | z ∈ n} = {n} :=
-          notions_state_singleton (X := X) (x := n) hnNotions
+          k.notions_state_singleton (X := X) (x := n) hnNotions
         have hstate_mem : {Notion z | z ∈ n} ∈ Kcomp :=
           Or.inl ⟨ n, hnNotions, rfl ⟩
         have hstate_in_Kqx : {Notion z | z ∈ n} ∈ @K_q (Set X) ks x := by
@@ -218,7 +232,9 @@ instance {X : Type u} : Coe (KnowledgeStructure X) (DiscriminativeKStructure (Se
             exact hstate_mem
           · exact hxs
         have hstate_in_Kqy : {Notion z | z ∈ n} ∈ @K_q (Set X) ks y := by
-          simpa [hy.right] using hstate_in_Kqx
+          have hK :
+              @K_q (Set X) ks y = @K_q (Set X) ks x := hy.right
+          exact hK.symm ▸ hstate_in_Kqx
         have hx_single : x ∈ ({n} : Set (Set X)) := by
           simpa [hsingle] using hxs
         have hy_single : y ∈ ({n} : Set (Set X)) := by
@@ -229,7 +245,7 @@ instance {X : Type u} : Coe (KnowledgeStructure X) (DiscriminativeKStructure (Se
       · intro hy
         have hyx : y = x := Set.mem_singleton_iff.mp hy
         subst y
-        exact @notion_contains_q (Set X) ks x hx
+        exact @ks.notion_contains_q (Set X) x hx
     DiscriminativeKStructure.mk ks hksan
 
 structure FiniteKStructure X extends KnowledgeStructure X where
