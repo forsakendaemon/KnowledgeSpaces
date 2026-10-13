@@ -29,7 +29,11 @@ namespace KnowledgeSpace
 
 variable {X : Type u} [KnowledgeSpace X] {x y : Set X} {p q : X}
 
+def Domain : Set X := KnowledgeStructure.Domain
+
 def States : Set (Set X) := KnowledgeStructure.States
+
+def restrict : (A : Set X) -> Set (Set ↑A) := KnowledgeStructure.restrict
 
 @[instance_reducible]
 def Dual :=
@@ -61,5 +65,26 @@ def Dual :=
   let fam : Family X := Family.mk (fun s => s ∈ Kbar)
   letI : Family X := fam
   KnowledgeStructure.mk hkbne hkbce hkbcu
+
+@[instance_reducible]
+def subKnowledgeStructure
+    (dk : KnowledgeSpace X)
+    (A : Set X)
+    (hAne : A.Nonempty)
+    (hAsub : A ⊆ dk.Domain) :
+    KnowledgeSpace A :=
+  letI : KnowledgeStructure X := dk.toKnowledgeStructure
+  let ks : KnowledgeStructure A := .subKnowledgeStructure A hAne hAsub
+  let h : (∀ {x y : Set A}, ks.IsMember x → ks.IsMember y → ks.IsMember (x ∪ y)) := by
+    intro x y hx hy
+    change x ∈ restrict A at hx
+    change y ∈ restrict A at hy
+    change x ∪ y ∈ restrict A
+    rcases hx with ⟨ kx, hkx, rfl ⟩
+    rcases hy with ⟨ ky, hky, rfl ⟩
+    refine ⟨ kx ∪ ky, closed_union hkx hky, ?_ ⟩
+    ext a
+    rfl
+  mk h
 
 end KnowledgeSpace

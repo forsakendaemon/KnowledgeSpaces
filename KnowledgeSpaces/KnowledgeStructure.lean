@@ -14,6 +14,7 @@ public import KnowledgeSpaces.Family
 public import Mathlib.Basic.Rel
 public import Mathlib.Basic.Finite.Defs
 public import Mathlib.Basic.Countable.Basic
+public import Mathlib.Algebra.Quotient
 
 /-!
 # Knowledge Structure
@@ -40,9 +41,9 @@ namespace KnowledgeStructure
 
 variable {x y : Set X} {p q : X}
 
-def States : Set (Set X) := {x | IsMember x}
+public def States : Set (Set X) := {x | IsMember x}
 
-def Domain : Set X := ⋃₀ States
+public def Domain : Set X := ⋃₀ States
 
 theorem states_subset_domain :
   IsMember x -> x ⊆ Domain := by
@@ -54,13 +55,13 @@ theorem items_in_states_in_domain :
     intro hx hp
     exact states_subset_domain hx hp
 
-def K_q (q : X) : Set (Set X) :=
+public def K_q (q : X) : Set (Set X) :=
     { x | IsMember x ∧ q ∈ x }
 
-def Notion (q : X) : Set X :=
+public def Notion (q : X) : Set X :=
   { p ∈ Domain | K_q p = K_q q}
 
-def Notions : Set (Set X) :=
+public def Notions : Set (Set X) :=
   { Notion x | x ∈ Domain}
 
 lemma notion_contains_q :
@@ -126,6 +127,55 @@ theorem notion_equiv :
     exact hxy.trans hyz
 }
 
+def notionSetoid (X : Type u) [KnowledgeStructure X] : Setoid X where
+  r p q := Notion p = Notion q
+  iseqv := notion_equiv
+
+abbrev QuotientDomain (X : Type u) [KnowledgeStructure X] :=
+  Quotient (notionSetoid X)
+
+def quotientMap (X : Type u) [KnowledgeStructure X] : X → QuotientDomain X :=
+  Quotient.mk (notionSetoid X)
+
+def quotientState (s : Set X) : Set (QuotientDomain X) :=
+  quotientMap X '' s
+
+def quotientStates (X : Type u) [KnowledgeStructure X] : Set (Set (QuotientDomain X)) :=
+  {t | ∃ s, IsMember s ∧ t = quotientState s}
+
+@[instance_reducible]
+def quotientKnowledgeStructureByNotion (X : Type u) [KnowledgeStructure X] :
+    KnowledgeStructure (QuotientDomain X) :=
+  let Q := quotientStates X
+  let fam : Family (QuotientDomain X) :=
+    Family.mk (fun t => t ∈ Q)
+  have h_empty : ∅ ∈ Q := by
+    refine ⟨∅, KnowledgeStructure.empty_in_states, ?_⟩
+    simp [quotientState]
+  have h_domain_eq :
+      ⋃₀ Q = quotientState Domain := by
+    ext z
+    constructor
+    · intro hz
+      rcases Set.mem_sUnion.mp hz with ⟨t, htQ, hzt⟩
+      rcases htQ with ⟨s, hs, rfl⟩
+      rcases hzt with ⟨x, hxs, rfl⟩
+      exact ⟨x, items_in_states_in_domain hs hxs, rfl⟩
+    · intro hz
+      rcases hz with ⟨x, hxD, rfl⟩
+      rcases Set.mem_sUnion.mp hxD with ⟨s, hs, hxs⟩
+      exact Set.mem_sUnion.mpr
+        ⟨quotientState s, ⟨s, hs, rfl⟩, ⟨x, hxs, rfl⟩⟩
+  have h_nonempty : (⋃₀ Q).Nonempty := by
+    rw [h_domain_eq]
+    rcases (KnowledgeStructure.domain_nonempty (X := X)) with ⟨x, hx⟩
+    exact ⟨quotientMap X x, ⟨x, hx, rfl⟩⟩
+  have h_domain : ⋃₀ Q ∈ Q := by
+    rw [h_domain_eq]
+    exact ⟨Domain, KnowledgeStructure.domain_in_states (X := X), rfl⟩
+  letI : Family (QuotientDomain X) := fam
+  KnowledgeStructure.mk h_nonempty h_empty h_domain
+
 lemma notion_eq_of_K_q_eq :
   K_q p = K_q q -> Notion p = Notion q := by
   intro h
@@ -155,107 +205,59 @@ lemma notions_state_singleton :
     subst n
     exact ⟨y, notion_contains_q hy, rfl⟩
 
+public def restrict (A : Set X) : Set (Set A) :=
+  {h | ∃ k : Set X, IsMember k ∧ h = Subtype.val ⁻¹' k}
+
+@[instance_reducible]
+def subKnowledgeStructure
+    (A : Set X)
+    (hAne : A.Nonempty)
+    (hAsub : A ⊆ Domain) :
+    KnowledgeStructure A :=
+  let Q := restrict A
+  have hne : (⋃₀ Q).Nonempty := by
+    rcases hAne with ⟨ x, hxA ⟩
+    refine ⟨ ⟨ x, hxA ⟩, ?_ ⟩
+    let b : Set ↑A := Subtype.val ⁻¹' Domain
+    have h₁ : b ∈ Q := ⟨ Domain, domain_in_states, rfl ⟩
+    have h₂ : ∃ t ∈ Q, ⟨ x, hxA ⟩ ∈ t := ⟨ b, h₁, hAsub hxA ⟩
+    exact Set.mem_sUnion.mpr h₂
+  have hempty : ∅ ∈ Q := by
+    exact ⟨ ∅, empty_in_states, rfl ⟩
+  have hdomain : ⋃₀ Q ∈ Q := by
+    refine ⟨ Domain, domain_in_states, ?_ ⟩
+    ext a
+    constructor
+    · intro ha
+      rw [Set.mem_preimage]
+      rcases Set.mem_sUnion.mp ha with ⟨ s, hsQ, has ⟩
+      rcases hsQ with ⟨ k, hk, rfl ⟩
+      exact items_in_states_in_domain hk has
+    · intro ha
+      let b : Set ↑A := Subtype.val ⁻¹' Domain
+      have h₁ : b ∈ Q := ⟨ Domain, domain_in_states, rfl ⟩
+      have h₂ : ∃ t ∈ Q, a ∈ t := ⟨ b, h₁, hAsub a.property ⟩
+      exact Set.mem_sUnion.mpr h₂
+  let fam : Family A := Family.mk (fun h => h ∈ Q)
+  letI : Family A := fam
+  mk hne hempty hdomain
+
 end KnowledgeStructure
 
-def Domain : Set X := KnowledgeStructure.Domain
+public class CountableKStructure X extends KnowledgeStructure X where
+  domain_countable : Countable X
 
-def Notion : X -> Set X := KnowledgeStructure.Notion
+public class EssentiallyCountableKStructure X extends KnowledgeStructure X where
+  states_countable : Countable {x | IsMember x}
 
-def Notions : Set (Set X) := KnowledgeStructure.Notions
-
-def K_q : X -> Set (Set X) := KnowledgeStructure.K_q
-
-structure DiscriminativeKStructure (X : Type u) extends KnowledgeStructure X where
-  atomic_notions :
-    ∀ p, p ∈ @Domain X toKnowledgeStructure ->
-    @Notion X toKnowledgeStructure p = {p}
-
-instance {X : Type u} : Coe (KnowledgeStructure X) (DiscriminativeKStructure (Set X)) where
-  coe k :=
-    letI : KnowledgeStructure X := k
-    let Kstar := {{Notion x | x ∈ y} | y ∈ Notions}
-    let Ustar := ⋃₀ Kstar
-    let Kcomp : Set (Set (Set X)):= Kstar ∪ {Ustar, ∅}
-    let hkcne : (⋃₀ Kcomp).Nonempty := by
-      rcases k.domain_nonempty with ⟨ x, hx ⟩
-      refine ⟨ Notion x, ?_ ⟩
-      exact Set.mem_sUnion.mpr
-        ⟨ {Notion z | z ∈ Notion x},
-          Or.inl ⟨ Notion x, ⟨ x, hx, rfl ⟩, rfl ⟩,
-          ⟨ x, k.notion_contains_q hx, rfl ⟩ ⟩
-    let hkcce : ∅ ∈ Kcomp := by
-      exact Or.inr (by simp)
-    let hkccu : ⋃₀ Kcomp ∈ Kcomp := by
-      have hUnion : ⋃₀ Kcomp = Ustar := by
-        ext a
-        constructor
-        · intro ha
-          rcases Set.mem_sUnion.mp ha with ⟨s, hsKcomp, has⟩
-          rcases hsKcomp with hsKstar | hsRight
-          · exact Set.mem_sUnion.mpr ⟨s, hsKstar, has⟩
-          · rcases (by simpa using hsRight : s = Ustar ∨ s = ∅) with rfl | rfl
-            · exact has
-            · simp at has
-        · intro ha
-          exact Set.mem_sUnion.mpr ⟨Ustar, Or.inr (by simp), ha⟩
-      exact Or.inr (by simp [hUnion])
-    let fam : Family (Set X) := Family.mk (fun s => s ∈ Kcomp)
-    let ks : KnowledgeStructure (Set X) := by
-      letI : Family (Set X) := fam
-      exact KnowledgeStructure.mk hkcne hkcce hkccu
-    let hksan : ∀ x, x ∈ @Domain (Set X) ks -> (@Notion (Set X) ks x) = {x} := by
-      intro x hx
-      ext y
-      constructor
-      · intro hy
-        have hxKcomp : x ∈ ⋃₀ Kcomp := by
-          rcases Set.mem_sUnion.mp hx with ⟨s, hs, hxs⟩
-          exact Set.mem_sUnion.mpr ⟨s, by
-            change s ∈ Kcomp at hs
-            exact hs, hxs⟩
-        have hxUstar : x ∈ Ustar := by
-          rcases Set.mem_sUnion.mp hxKcomp with ⟨ s, hsKcomp, hxs ⟩
-          rcases hsKcomp with hsKstar | hsRight
-          · exact Set.mem_sUnion.mpr ⟨ s, hsKstar, hxs ⟩
-          · rcases (by simpa using hsRight : s = Ustar ∨ s = ∅) with rfl | rfl
-            · exact hxs
-            · simp at hxs
-        rcases Set.mem_sUnion.mp hxUstar with ⟨ s, hsKstar, hxs ⟩
-        rcases hsKstar with ⟨ n, hnNotions, rfl ⟩
-        have hsingle : {Notion z | z ∈ n} = {n} :=
-          k.notions_state_singleton (X := X) (x := n) hnNotions
-        have hstate_mem : {Notion z | z ∈ n} ∈ Kcomp :=
-          Or.inl ⟨ n, hnNotions, rfl ⟩
-        have hstate_in_Kqx : {Notion z | z ∈ n} ∈ @K_q (Set X) ks x := by
-          constructor
-          · change {Notion z | z ∈ n} ∈ Kcomp
-            exact hstate_mem
-          · exact hxs
-        have hstate_in_Kqy : {Notion z | z ∈ n} ∈ @K_q (Set X) ks y := by
-          have hK :
-              @K_q (Set X) ks y = @K_q (Set X) ks x := hy.right
-          exact hK.symm ▸ hstate_in_Kqx
-        have hx_single : x ∈ ({n} : Set (Set X)) := by
-          simpa [hsingle] using hxs
-        have hy_single : y ∈ ({n} : Set (Set X)) := by
-          simpa [hsingle] using hstate_in_Kqy.right
-        have hx_eq : x = n := Set.mem_singleton_iff.mp hx_single
-        have hy_eq : y = n := Set.mem_singleton_iff.mp hy_single
-        exact Set.mem_singleton_iff.mpr (hy_eq.trans hx_eq.symm)
-      · intro hy
-        have hyx : y = x := Set.mem_singleton_iff.mp hy
-        subst y
-        exact @ks.notion_contains_q (Set X) x hx
-    DiscriminativeKStructure.mk ks hksan
-
-structure FiniteKStructure X extends KnowledgeStructure X where
+public class FiniteKStructure X extends
+  KnowledgeStructure X, CountableKStructure X where
   domain_finite : Finite X
+  domain_countable := by
+    exact Countable.of_finite domain_finite
 
-structure EssentiallyFiniteKStructure X extends KnowledgeStructure X where
+public class EssentiallyFiniteKStructure X extends
+  KnowledgeStructure X, EssentiallyCountableKStructure X where
   states_finite : Finite {x | IsMember x}
-
-structure CountableKStructure X extends KnowledgeStructure X where
-  domain_finite : Countable X
-
-structure EssentiallyCountableKStructure X extends KnowledgeStructure X where
-  states_finite : Countable {x | IsMember x}
+  states_countable := by
+    exact Countable.of_finite states_finite
